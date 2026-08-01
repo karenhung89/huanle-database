@@ -422,6 +422,57 @@ textarea{
   40%{opacity:1; transform:translate(-50%,-80%) scale(1.2)}
   100%{opacity:0; transform:translate(-50%,-160%) scale(1)}
 }
+/* ============ 字体模式切换 ============ */
+body.font-kaiti{
+  font-family:"KaiTi","STKaiti","楷体","BiauKai",serif;
+}
+body.font-kaiti h1,body.font-kaiti h2,body.font-kaiti h3,body.font-kaiti h4{
+  font-family:"KaiTi","STKaiti","楷体",serif; letter-spacing:0;
+}
+body.font-kaiti .big-char{font-family:"KaiTi","STKaiti","楷体",serif;border-radius:12px}
+body.font-kaiti .tab{font-family:"KaiTi","STKaiti","楷体",serif}
+body.font-kaiti input,body.font-kaiti select,body.font-kaiti textarea,body.font-kaiti button{
+  font-family:"KaiTi","STKaiti","楷体",sans-serif;
+}
+body.font-kaiti ruby rt{font-family:"KaiTi","STKaiti","楷体",sans-serif;letter-spacing:0}
+
+/* 顶部工具栏按钮 */
+.header-tools{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.tool-btn{
+  border:none;background:rgba(255,255,255,.7);border-radius:14px;
+  padding:6px 12px;font-size:13px;cursor:pointer;
+  font-family:inherit;color:#5c3b20;box-shadow:0 2px 0 rgba(0,0,0,.08);
+  transition:transform .1s,background .2s;
+}
+.tool-btn:active{transform:translateY(2px);box-shadow:0 0 0}
+.tool-btn.on{background:#FFE89A;color:#7a4a00}
+
+/* 课文MP3播放器 */
+.mp3-player{
+  margin-top:10px;padding:12px 14px;border-radius:16px;
+  background:linear-gradient(135deg,#FFF7E1,#E9F7FF);
+  border:2px dashed #9CC9FF;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.mp3-title{font-size:14px;color:var(--ink2);flex:1;min-width:140px}
+audio.lesson-audio{height:38px;flex:2;min-width:220px;border-radius:30px}
+
+/* BGM 控件（右上角浮动） */
+.bgm-box{
+  position:fixed;top:10px;right:10px;z-index:60;
+  background:rgba(255,255,255,.88);backdrop-filter:blur(8px);
+  border-radius:30px;padding:6px 8px 6px 12px;display:flex;align-items:center;gap:8px;
+  box-shadow:0 4px 14px rgba(255,154,90,.22);font-size:13px;
+}
+.bgm-btn{
+  width:30px;height:30px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#7BD389,#4BBE5D);color:white;font-size:15px;
+  display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;
+}
+.bgm-btn.off{background:linear-gradient(135deg,#ccc,#aaa)}
+.bgm-vol{width:50px;height:4px;accent-color:#FF9A5A;cursor:pointer;margin:0 2px}
+.bgm-label{color:var(--muted);font-size:12px;white-space:nowrap;display:none}
+@media(min-width:520px){.bgm-label{display:inline}}
+
 </style>
 </head>
 <body>
@@ -433,6 +484,9 @@ textarea{
       <h1>🌈 欢乐伙伴 · 华文小乐园</h1>
       <p id="sub">小朋友一起来学生字、念课文吧～</p>
     </div>
+  </div>
+  <div class="header-tools">
+    <button class="tool-btn" id="btn-font" onclick="toggleFont()" title="切换字体">🎨 卡通字</button>
   </div>
   <div class="header-stats" id="header-stats"></div>
 </header>
@@ -478,6 +532,11 @@ textarea{
         <button class="btn ghost" onclick="copyPY()">📋 复制拼音</button>
         <button class="btn ghost" onclick="copyHZ()">📋 复制汉字</button>
       </div>
+      <div class="mp3-player">
+        <span class="mp3-title" id="mp3-title">🎧 真人朗读（男声普通话）</span>
+        <audio id="lesson-audio" class="lesson-audio" controls preload="none"></audio>
+        <span id="mp3-hint" style="font-size:12px;color:var(--muted);width:100%"></span>
+      </div>
       <div class="voice-box">
         <label class="voice-lbl">🗣️ 朗读语音：</label>
         <select id="voice-sel" onchange="saveVoicePref()"></select>
@@ -499,6 +558,16 @@ textarea{
       ④ 拼音文本仅供对照，电脑/手机目前没有能直接念出拼音字母（b p m f）的声音，复制拼音文本可以贴到课本或打印使用。
     </p>
   </div>
+</div>
+
+<!-- BGM 浮动控件 -->
+<div class="bgm-box" id="bgm-box">
+  <button class="bgm-btn off" id="bgm-btn" onclick="toggleBGM()" title="背景音乐">🎵</button>
+  <span class="bgm-label">🎶 轻音乐</span>
+  <input type="range" class="bgm-vol" id="bgm-vol" min="0" max="1" step="0.05" value="0.3" oninput="setBGMVol(this.value)" title="音量">
+  <audio id="bgm-audio" loop preload="auto">
+    <source src="audio/bgm.mp3" type="audio/mpeg">
+  </audio>
 </div>
 
 <!-- 底部导航 -->
@@ -543,6 +612,9 @@ function init(){
   document.getElementById('q').addEventListener('focus', e=>popEmoji(e.target,'✨'));
   renderLessons();
   fillLessonSelect();
+  initFont();      // 初始化字体模式
+  initBGM();       // 初始化背景音乐
+  initLessonAudio(); // 初始化课文MP3
 }
 
 function fillHeaderStats(){
@@ -939,6 +1011,11 @@ function openLesson(book, no){
         <button class="btn ${color?.tab||'o'}" onclick="loadTTS();switchTab('tts')">🔊 听这课</button>
       </div>
     </div>
+    <div class="mp3-player">
+      <span class="mp3-title" style="min-width:100%">🎧 男声真人朗读《${escapeHTML(l.title)}》</span>
+      <audio controls preload="none" style="width:100%;height:38px" src="${lessonAudioPath(book,no)}"></audio>
+      <span style="font-size:12px;color:var(--muted);width:100%">💡 点 ▶ 听真人普通话朗读，如没声音请确认 audio 文件夹和 search.html 在同一目录</span>
+    </div>
   </div>`;
 
   html += `<div class="card"><div class="reader-text">`;
@@ -1258,7 +1335,89 @@ if('speechSynthesis' in window){
     loadVoicePref();
   };
 }
+
+/* ============ 字体切换 ============ */
+function initFont(){
+  const mode = localStorage.getItem('hb_font_mode') || 'cute';
+  applyFont(mode);
+}
+function toggleFont(){
+  const cur = document.body.classList.contains('font-kaiti') ? 'cute' : 'kaiti';
+  applyFont(cur);
+  localStorage.setItem('hb_font_mode', cur);
+}
+function applyFont(mode){
+  const btn = document.getElementById('btn-font');
+  if(mode==='kaiti'){
+    document.body.classList.add('font-kaiti');
+    btn.textContent = '✒️ 楷体';
+    btn.classList.add('on');
+  } else {
+    document.body.classList.remove('font-kaiti');
+    btn.textContent = '🎨 卡通字';
+    btn.classList.remove('on');
+  }
+}
+
+/* ============ BGM 背景音乐 ============ */
+function initBGM(){
+  const aud = document.getElementById('bgm-audio');
+  const btn = document.getElementById('bgm-btn');
+  const vol = document.getElementById('bgm-vol');
+  const savedOn = localStorage.getItem('hb_bgm_on') === '1';
+  const savedVol = parseFloat(localStorage.getItem('hb_bgm_vol')) || 0.25;
+  aud.volume = savedVol; vol.value = savedVol;
+  if(savedOn){
+    btn.classList.remove('off'); btn.textContent='🎵';
+    aud.play().catch(()=>{});
+  } else {
+    btn.classList.add('off'); btn.textContent='🔇';
+  }
+  btn.addEventListener('click', toggleBGM);
+  aud.addEventListener('play', ()=>{btn.classList.remove('off');btn.textContent='🎵';localStorage.setItem('hb_bgm_on','1');});
+  aud.addEventListener('pause',()=>{btn.classList.add('off');btn.textContent='🔇';localStorage.setItem('hb_bgm_on','0');});
+}
+function toggleBGM(){
+  const aud = document.getElementById('bgm-audio');
+  if(aud.paused){ aud.play().catch(e=>alert('无法播放背景音乐：\n'+e.message+'\n\n提示：请确认 audio/bgm.mp3 和 search.html 在同一文件夹里，且第一次打开先点一下页面。')); }
+  else { aud.pause(); }
+}
+function setBGMVol(v){
+  document.getElementById('bgm-audio').volume = parseFloat(v);
+  localStorage.setItem('hb_bgm_vol', v);
+}
+
+/* ============ 课文MP3（真人男声朗读） ============ */
+function lessonAudioPath(book, no){
+  const n = String(no).padStart(2,'0');
+  return `audio/${book}_L${n}.mp3`;
+}
+function loadLessonAudio(book, no, title){
+  const aud = document.getElementById('lesson-audio');
+  const ttl = document.getElementById('mp3-title');
+  const hint = document.getElementById('mp3-hint');
+  const src = lessonAudioPath(book, no);
+  aud.src = src;
+  ttl.textContent = `🎧 ${book} 第${no}课《${title}》· 男声真人朗读`;
+  hint.textContent = '💡 点下面播放器中间 ▶ 即可听真人朗读；如没声音请确认 audio 文件夹和 search.html 在同一目录';
+  aud.load();
+}
+// 包装 loadTTS，打开课的时候顺便加载MP3
+(function(){
+  if(typeof window.loadTTS !== 'function') return;
+  const _old = window.loadTTS;
+  window.loadTTS = function(){
+    _old();
+    const bk = document.getElementById('t-book').value;
+    const ls = document.getElementById('t-lesson');
+    const no = parseInt(ls.value);
+    const title = (ls.options[ls.selectedIndex]?.text||'').replace(/^\d+\.\s*/,'').trim();
+    loadLessonAudio(bk, no, title);
+    if('speechSynthesis' in window) speechSynthesis.cancel();
+  };
+})();
+
 </script>
 </body>
 </html>
-<!--06917208412395614730080200--><!--20322323922395614730080201--><!--20901328922395614730080201--><!--20978928482573747210080201--><!--21200696892395614730080201--><!--21512112572395614730080201-->
+<!--06917208412395614730080200--><!--20322323922395614730080201--><!--20901328922395614730080201--><!--20978928482573747210080201--><!--21200696892395614730080201--><!--27729594322573747210080201--><!--27815934932573747210080201--><!--27986937812395614730080201--><!--28156714212573747210080201--><!--28613762402573747210080201--><!--28813899502573747210080201--><!--33154467532395614730080201-->
